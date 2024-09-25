@@ -140,8 +140,10 @@ describe("Given that I am a user on login page", () => {
   describe("When I do fill fields in incorrect format and I click on admin button Login In", () => {
     test("Then it should renders Login page", () => {
       document.body.innerHTML = LoginUI();
-
+      // screen.debug();
       const inputEmailUser = screen.getByTestId("admin-email-input");
+      // expect(inputEmailUser).toBeInTheDocument();
+      // console.log(inputEmailUser);
       fireEvent.change(inputEmailUser, { target: { value: "pasunemail" } });
       expect(inputEmailUser.value).toBe("pasunemail");
 
