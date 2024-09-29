@@ -2,16 +2,16 @@
  * @jest-environment jsdom
  */
 
-import { screen, waitFor } from "@testing-library/dom/"
+import { fireEvent, screen, waitFor } from "@testing-library/dom/"
 import '@testing-library/jest-dom/extend-expect'
 import BillsUI from "../views/BillsUI.js"
 import { bills } from "../fixtures/bills.js"
 import Bills from "../containers/Bills.js"
-// import mockStore from "../__mocks__/store.js";
-import { ROUTES_PATH } from "../constants/routes.js";
+import { ROUTES, ROUTES_PATH } from "../constants/routes.js";
 import { localStorageMock } from "../__mocks__/localStorage.js";
-
+import mockStore from "../__mocks__/store.js"
 import router from "../app/Router.js";
+import * as format from "../app/format.js"
 
 describe("Given I am connected as an employee", () => {
   describe("When I am on Bills Page", () => {
@@ -26,13 +26,11 @@ describe("Given I am connected as an employee", () => {
       document.body.append(root)
       router()
       window.onNavigate(ROUTES_PATH.Bills)
-      await waitFor(() => screen.getByTestId('icon-window'))
-      const windowIcon = screen.getByTestId('icon-window')
-      //to-do write expect expression
+      const windowIcon = await waitFor(() => screen.getByTestId('icon-window'))
+
       expect(windowIcon).toHaveClass('active-icon')
-      // expect(windowIcon.classList).toHaveClass('active-icon')
     })
-    test("Then bills should be ordered from earliest to latest", () => {
+    test("Then bills should be ordered from latest to earliest", () => {
       document.body.innerHTML = BillsUI({ data: bills })
       const dates = screen.getAllByText(/^(19|20)\d\d[- /.](0[1-9]|1[012])[- /.](0[1-9]|[12][0-9]|3[01])$/i).map(a => a.innerHTML)
 
@@ -94,7 +92,7 @@ describe("Given I am an employee", () => {
 //   describe("When I fetch bills", () => {
 //     test("Then it should fetch bills from mock API GET", async () => {
 //       const billsInstance = new Bills({ document, onNavigate: null, store: mockStore, localStorage: window.localStorage });
-     
+
 //       const getSpy = jest.spyOn(mockStore, 'bills');
 //       const bills = await billsInstance.getBills();
 
@@ -103,4 +101,100 @@ describe("Given I am an employee", () => {
 //     });
 //   });
 // });
+// ########## ça marche ###############
+// describe("Given I am an employee", () => {
+//   describe("When I click on an eye icon", () => {
+//     test("Then a modal should open displaying the bill image", () => {
+//       document.body.innerHTML = `<div id="modaleFile"><div class="modal-body"></div></div>`;
+//       $.fn.modal = jest.fn();
+//       const icon = { getAttribute: jest.fn(() => 'http://url.com') };
+//       const billsInstance = new Bills({ document, onNavigate: null, store: null, localStorage: window.localStorage });
+//       billsInstance.handleClickIconEye(icon);
+//       const img = document.querySelector('.bill-proof-container img');
+//       expect(img.src).toBe('http://url.com/');
+
+//       expect($.fn.modal).toHaveBeenCalledWith('show');
+//     });
+//   });
+// });
+
+
+describe("Given I am connected as an employee", () => {
+  describe("When I am on Bills Page", () => {
+    describe("when i am on Bills Page and I click on the eye icon", () => {
+      test("Then modal should open width the bill's proof", async () => {
+        Object.defineProperty(window, 'localStorage', { value: localStorageMock })
+        window.localStorage.setItem('user', JSON.stringify({
+          type: 'Employee'
+        }))
+        const onNavigate = (pathname) => { document.body.innerHTML = ROUTES({ pathname }) }
+
+        const billContainer = new Bills({
+          document, onNavigate, store: null, localStorage: window.localStorage
+        })
+        document.body.innerHTML = BillsUI({ data: bills })
+
+        $.fn.modal = jest.fn()
+        const iconEye = await waitFor(() => screen.getAllByTestId('icon-eye')[0]);
+
+        const handleClickIconEye = jest.fn(() => billContainer.handleClickIconEye(iconEye))
+        iconEye.addEventListener('click', handleClickIconEye)
+        fireEvent.click(iconEye)
+
+        expect(handleClickIconEye).toHaveBeenCalled();
+        expect($.fn.modal).toHaveBeenCalledWith('show');
+
+        const modal = document.getElementById("modaleFile");
+        expect(modal).toBeTruthy();
+
+        const modalImg = document.querySelector('.modal-body img')
+        expect(modalImg).toBeTruthy();
+      })
+    })
+  })
+})
+
+
+describe("Given I am connected as an employee", () => {
+  describe("When I am on Bills Page", () => {
+    describe("When I call getBills method", () => {
+      test("Then it should fetch bills", async () => {
+
+        Object.defineProperty(window, 'localStorage', { value: localStorageMock })
+        window.localStorage.setItem('user', JSON.stringify({
+          type: 'Employee',
+          email: "a@a"
+        }))
+
+        const onNavigate = (pathname) => { document.body.innerHTML = ROUTES({ pathname }) }
+
+        const billsContainer = new Bills({
+          document, onNavigate, store: mockStore, localStorage: window.localStorage
+        })
+
+        const spyFormatDate = jest.spyOn(format, 'formatDate');
+        const spyFormatStatus = jest.spyOn(format, 'formatStatus');
+
+        const bills = await billsContainer.getBills();
+
+        expect(Array.isArray(bills)).toBe(true);
+
+        const originalBills = await mockStore.bills().list()
+        expect(spyFormatDate).toHaveBeenCalled()
+        expect(spyFormatStatus).toHaveBeenCalled()
+
+        bills.forEach((bill, index) => {
+          const originalBill = originalBills[index]
+          const expectedFormatteDate = format.formatDate(originalBill.date)
+          expect(bill.date).toEqual(expectedFormatteDate)
+
+          const expectedFormattedStatus = format.formatStatus(originalBill.status)
+          expect(bill.status).toEqual(expectedFormattedStatus)
+        })
+
+      })
+
+    })
+  })
+})
 
